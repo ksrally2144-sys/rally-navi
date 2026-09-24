@@ -387,7 +387,7 @@
             border: 1px solid rgba(255,255,255,0.25);
             padding: 14px 20px;
             border-radius: 18px;
-            display: none; /* Initially hidden, shown when sim mode is active */
+            display: none; /* Controlled via JS */
             flex-direction: column;
             gap: 10px;
             width: 90%;
@@ -538,7 +538,7 @@
     <!-- Modal: Event & Time Attack Management -->
     <div id="modal-event" class="modal-overlay">
         <div class="modal-card">
-            <div class="modal-title">🏁 ラリーイベント & リザルト共有</div>
+            <div class="modal-title" id="event-modal-title">🏁 ラリーイベント & リザルト共有</div>
             <div id="auth-status-box" style="background:#1e293b; padding:12px; border-radius:12px; font-size:13px;">
                 現在のステータス: <strong id="current-user-display" style="color:#38bdf8;">未登録</strong>
             </div>
@@ -573,11 +573,19 @@
             <div class="modal-title">⚙ 管理者イベント設定</div>
             <div class="form-group">
                 <label>イベント名</label>
-                <input type="text" id="admin-event-name" placeholder="例: 2026 BRIG タイムアタック戦">
+                <input type="text" id="admin-event-name" placeholder="例: 第1回 クーパーズカップ">
             </div>
             <div class="form-group">
                 <label>開催日時</label>
                 <input type="datetime-local" id="admin-event-date">
+            </div>
+            <div class="form-group">
+                <label>コース名 / SS名</label>
+                <input type="text" id="admin-course-name" placeholder="例: 御岳山SSヒルクライム">
+            </div>
+            <div class="form-group">
+                <label>参加者ログインパスワード設定</label>
+                <input type="text" id="admin-login-pass" placeholder="参加者が認証に使うパスワード">
             </div>
             <div class="modal-btn-row">
                 <button class="modal-btn btn-danger" onclick="clearEventResults()">全リザルト初期化</button>
@@ -587,7 +595,7 @@
         </div>
     </div>
 
-    <!-- Simulation Control Panel -->
+    <!-- Simulation Control Panel (Restored and visible in Sim Mode) -->
     <div id="sim-controls">
         <div class="sim-row">
             <button class="sim-btn sim-btn-start" onclick="startSimulationRun()">▶ 走行スタート</button>
@@ -615,7 +623,7 @@
 
         let routeMode = 'none'; 
         let mode = 'gps'; 
-        let mapOrientation = 'head'; 
+        let mapOrientation = 'north'; 
         let realViewActive = false;
         let settingsOpen = false;
         let audioEnabled = true;
@@ -636,7 +644,14 @@
         let simMarker = null;
 
         let currentUser = null;
-        let eventConfig = JSON.parse(localStorage.getItem('rally_event_config')) || { name: "第1回 クーパーズカップ タイムアタック", date: "2026-10-01T10:00" };
+        
+        // Event config & Auth settings stored in localStorage
+        let eventConfig = JSON.parse(localStorage.getItem('rally_event_config')) || { 
+            name: "第1回 クーパーズカップ タイムアタック", 
+            date: "2026-10-01T10:00", 
+            courseName: "御岳山SS",
+            participantPass: "rally2026" 
+        };
         let eventResults = JSON.parse(localStorage.getItem('rally_event_results')) || [];
         let ssStartTime = null;
         let isTiming = false;
@@ -963,6 +978,7 @@
 
         function openEventModal() {
             document.getElementById('modal-event').style.display = 'flex';
+            document.getElementById('event-modal-title').innerText = `🏁 ${eventConfig.name} (${eventConfig.courseName})`;
             renderResultsList();
             toggleSettingsMenu();
         }
@@ -970,33 +986,46 @@
         function registerParticipant() {
             const carNo = document.getElementById('input-car-no').value.trim();
             const name = document.getElementById('input-driver-name').value.trim();
+            const inputPass = prompt("参加者ログインパスワードを入力してください：");
+
             if (!carNo || !name) {
                 alert('カーナンバーとドライバー名を入力してください');
                 return;
             }
+            if (inputPass !== eventConfig.participantPass) {
+                alert('パスワードが違います');
+                return;
+            }
+
             currentUser = { carNo, name };
             document.getElementById('current-user-display').innerText = `No.${carNo} ${name} (ログイン中)`;
             document.getElementById('hud-user-info').innerText = `No.${carNo} ${name}`;
-            alert(`参加登録完了：No.${carNo} ${name}さん、お疲れ様です！`);
+            alert(`参加登録完了：No.${carNo} ${name}さん、ようこそ！`);
         }
 
         function openAdminSettings() {
             const pass = document.getElementById('admin-pass').value;
-            if (pass !== 'rally2026') {
+            // Default master password or current set participant pass can open admin
+            if (pass !== eventConfig.participantPass && pass !== 'rally2026') {
                 alert('管理者パスワードが違います');
                 return;
             }
             document.getElementById('admin-event-name').value = eventConfig.name;
             document.getElementById('admin-event-date').value = eventConfig.date;
+            document.getElementById('admin-course-name').value = eventConfig.courseName;
+            document.getElementById('admin-login-pass').value = eventConfig.participantPass;
             document.getElementById('modal-admin').style.display = 'flex';
         }
 
         function saveAdminSettings() {
             eventConfig.name = document.getElementById('admin-event-name').value;
             eventConfig.date = document.getElementById('admin-event-date').value;
+            eventConfig.courseName = document.getElementById('admin-course-name').value;
+            eventConfig.participantPass = document.getElementById('admin-login-pass').value;
             localStorage.setItem('rally_event_config', JSON.stringify(eventConfig));
             alert('管理者設定を保存しました');
             document.getElementById('modal-admin').style.display = 'none';
+            document.getElementById('event-modal-title').innerText = `🏁 ${eventConfig.name} (${eventConfig.courseName})`;
         }
 
         function clearEventResults() {
@@ -1020,7 +1049,7 @@
                     <div>
                         <span style="color:#f59e0b; font-weight:800; margin-right:6px;">#${i+1}</span>
                         <strong style="color:#fff;">No.${res.carNo} ${res.name}</strong>
-                        <div style="font-size:11px; color:#94a3b8;">${res.routeName || 'SSステージ'} / ${res.date}</div>
+                        <div style="font-size:11px; color:#94a3b8;">${res.routeName} / ${res.date}</div>
                     </div>
                     <div style="font-size:15px; font-weight:800; color:#22c55e;">${res.timeFormatted}</div>
                 </div>
@@ -1135,7 +1164,7 @@
                     name: currentUser.name,
                     timeSec: timeSec,
                     timeFormatted: timeFormatted,
-                    routeName: eventConfig.name,
+                    routeName: `${eventConfig.name} (${eventConfig.courseName})`,
                     date: new Date().toLocaleDateString()
                 });
                 localStorage.setItem('rally_event_results', JSON.stringify(eventResults));
