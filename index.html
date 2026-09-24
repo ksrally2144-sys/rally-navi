@@ -113,22 +113,6 @@
             align-items: flex-end;
             pointer-events: none;
         }
-        
-        .center-stripe {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 4px;
-            height: 100%;
-            background: repeating-linear-gradient(
-                0deg,
-                #facc15,
-                #facc15 30px,
-                transparent 30px,
-                transparent 60px
-            );
-        }
 
         /* Top HUD Overlay */
         #hud-container {
@@ -233,7 +217,6 @@
         }
         .unit-toggle-btn:active { transform: scale(0.92); }
 
-        /* Settings Icon Button (Positioned top-right under the distance/unit slider) */
         .settings-icon-btn {
             pointer-events: auto;
             background: #2563eb;
@@ -265,12 +248,12 @@
             color: #e2e8f0;
         }
 
-        /* Settings Dropdown Menu (Positioned near top-left or top-right based on settings button) */
+        /* Settings Dropdown Menu */
         #settings-container {
             position: absolute;
             top: 105px;
             right: 15px;
-            z-index: 1005;
+            z-index: 1500;
             display: flex;
             flex-direction: column;
             align-items: flex-end;
@@ -287,7 +270,7 @@
             border-radius: 16px;
             border: 1px solid rgba(255,255,255,0.25);
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            min-width: 200px;
+            min-width: 220px;
         }
         .ctrl-btn {
             background: rgba(30, 41, 59, 0.9);
@@ -307,6 +290,7 @@
         .ctrl-btn.audio-btn { background: #047857; border-color: #34d399; }
         .ctrl-btn.audio-btn.off { background: #334155; border-color: #64748b; color: #94a3b8; }
         .ctrl-btn.event-btn { background: #d97706; border-color: #f59e0b; }
+        .ctrl-btn.speech-mode-btn { background: #78350f; border-color: #b45309; }
 
         /* Modal Screens */
         .modal-overlay {
@@ -461,7 +445,6 @@
             max-width: 90%;
         }
 
-        /* WRC Style Red Round Sign Marker & Directional Arrow Marker Styles */
         .wrc-sign-marker {
             background: #dc2626;
             border: 3px solid #ffffff;
@@ -473,7 +456,6 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
         .car-arrow-marker {
             background: transparent;
@@ -527,7 +509,6 @@
                     </div>
                     <button id="btn-unit-toggle" class="unit-toggle-btn" onclick="toggleDistanceUnit()">10m</button>
                 </div>
-                <!-- Settings Icon Button placed right under the distance/unit slider -->
                 <button class="settings-icon-btn" onclick="toggleSettingsMenu()" title="設定">⚙</button>
             </div>
         </div>
@@ -537,12 +518,13 @@
         </div>
     </div>
 
-    <!-- Settings Menu Container (Top Right under HUD) -->
+    <!-- Settings Menu Container -->
     <div id="settings-container">
         <div id="controls-panel">
             <button id="btn-route-mode" class="ctrl-btn" onclick="toggleRouteMode()">📍 ルート設定</button>
             <button class="ctrl-btn" onclick="openRouteManagerModal()">📁 ルート管理・保存</button>
             <button class="ctrl-btn event-btn" onclick="openEventModal()">🏁 イベント・タイム計測</button>
+            <button id="btn-speech-mode" class="ctrl-btn speech-mode-btn" onclick="toggleSpeechOrderMode()">🔊 案内: 角度⇒距離</button>
             <button id="btn-gps-mode" class="ctrl-btn active-mode" onclick="setMode('gps')">🛰 GPSモード</button>
             <button id="btn-sim-mode" class="ctrl-btn" onclick="setMode('sim')">🎮 シミュ切替</button>
             <button id="btn-map-mode" class="ctrl-btn" onclick="toggleMapOrientation()">🗺 地図:ヘッド</button>
@@ -552,7 +534,7 @@
         </div>
     </div>
 
-    <!-- Modal: Route Manager (Save / Load) -->
+    <!-- Modal: Route Manager -->
     <div id="modal-route" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-title">📁 ルート保存・選択</div>
@@ -668,7 +650,8 @@
         let realViewActive = false;
         let settingsOpen = false;
         let audioEnabled = true;
-        let lastSpokenCornerId = null;
+        let speechOrderMode = 'angle-first'; // 'angle-first' (アール3、50m) or 'distance-first' (50m、アール3)
+        let lastPassedCornerIndex = -1; // Tracks the corner that was just passed to trigger immediate post-corner speech
 
         let startPoint = null;
         let finishPoint = null;
@@ -717,6 +700,19 @@
                 btn.innerText = '🔇 音声案内: OFF';
                 btn.classList.add('off');
             }
+        }
+
+        function toggleSpeechOrderMode() {
+            if (speechOrderMode === 'angle-first') {
+                speechOrderMode = 'distance-first';
+                document.getElementById('btn-speech-mode').innerText = '🔊 案内: 距離＋角度';
+                speakText('案内方式を、距離と角度に変更しました');
+            } else {
+                speechOrderMode = 'angle-first';
+                document.getElementById('btn-speech-mode').innerText = '🔊 案内: 角度⇒距離';
+                speakText('案内方式を、角度と距離に変更しました');
+            }
+            toggleSettingsMenu();
         }
 
         function speakText(text) {
@@ -797,6 +793,7 @@
                 routeCoords = [];
                 turfLine = null;
                 corners = [];
+                lastPassedCornerIndex = -1;
                 stopSimulationRun();
                 showBanner('地図上で【スタート地点】をタップしてください');
                 document.getElementById('btn-route-mode').classList.add('active-mode');
@@ -815,6 +812,7 @@
             routeCoords = [];
             turfLine = null;
             corners = [];
+            lastPassedCornerIndex = -1;
             markersGroup.clearLayers();
             if (routeLineLayer) map.removeLayer(routeLineLayer);
             stopSimulationRun();
@@ -825,7 +823,6 @@
             toggleSettingsMenu();
         }
 
-        // Helper to create WRC-style round red sign markers
         function createWrcMarker(text, isStart = true) {
             const size = 32;
             return L.divIcon({
@@ -873,6 +870,7 @@
 
                 analyzeCorners();
                 routeMode = 'nav';
+                lastPassedCornerIndex = -1;
                 
                 mapOrientation = 'head';
                 const btn = document.getElementById('btn-map-mode');
@@ -1073,7 +1071,7 @@
             eventConfig.loginPass = document.getElementById('admin-login-pass').value;
             
             localStorage.setItem('rally_event_config', JSON.stringify(eventConfig));
-            alert('管理者設定（イベント名・コース名・パスワード）を保存しました');
+            alert('管理者設定を保存しました');
             document.getElementById('modal-admin').style.display = 'none';
             document.getElementById('event-modal-title').innerText = `🏁 ${eventConfig.name} (${eventConfig.courseName})`;
         }
@@ -1106,7 +1104,6 @@
             `).join('');
         }
 
-        // Helper to create directional arrow marker for car position
         function createCarArrowIcon(heading = 0) {
             return L.divIcon({
                 className: 'car-arrow-marker',
@@ -1294,15 +1291,43 @@
                 updateHUD(distToCorner, bendText, nextCorner.level, currentSpeed, nextCorner.dir);
                 updateRoadVisual(distToCorner, nextCorner.dir, nextCorner.level);
 
-                // Voice guidance condition: when remaining distance is around 35m - 45m (when approaching 30m+ zone)
-                if (rawDist >= 30 && rawDist <= 45) {
-                    if (lastSpokenCornerId !== cornerIndex) {
-                        lastSpokenCornerId = cornerIndex;
-                        const dirName = nextCorner.dir === 'R' ? 'アール' : 'エル';
-                        const speechString = `${Math.round(rawDist)}メートル、${dirName}、${nextCorner.level}`;
-                        speakText(speechString);
+                // Check if we just passed a corner (the car has crossed the corner's location point)
+                // When nearestDist is slightly past a corner (e.g., within 0 to 8 meters after the corner), trigger immediate speech for the NEXT corner
+                for (let i = 0; i < corners.length; i++) {
+                    const c = corners[i];
+                    // If car is just 0 to 8 meters past this corner and we haven't spoken for passing this corner yet
+                    if (nearestDist >= c.distanceAlong && nearestDist <= c.distanceAlong + 8 && lastPassedCornerIndex !== i) {
+                        lastPassedCornerIndex = i;
+                        
+                        // Find the subsequent corner after this passed one
+                        let subsequentCorner = null;
+                        for (let j = 0; j < corners.length; j++) {
+                            if (corners[j].distanceAlong > nearestDist) {
+                                subsequentCorner = corners[j];
+                                break;
+                            }
+                        }
+
+                        if (subsequentCorner) {
+                            const subRawDist = Math.max(0, subsequentCorner.distanceAlong - nearestDist);
+                            const subDistRounded = Math.round(subRawDist / 10) * 10;
+                            const dirName = subsequentCorner.dir === 'R' ? 'アール' : 'エル';
+                            const lvl = subsequentCorner.level;
+
+                            let speechString = '';
+                            if (speechOrderMode === 'angle-first') {
+                                // Angle first: e.g., "エル、スリー、50メートル"
+                                speechString = `${dirName}、${lvl}、${subDistRounded}メートル`;
+                            } else {
+                                // Distance first: e.g., "50メートル、エル、スリー"
+                                speechString = `${subDistRounded}メートル、${dirName}、${lvl}`;
+                            }
+                            speakText(speechString);
+                        }
+                        break;
                     }
                 }
+
             } else {
                 updateHUD(0, 'GOAL', 0, currentSpeed, '');
                 updateRoadVisual(0, '', 0);
