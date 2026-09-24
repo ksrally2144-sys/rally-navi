@@ -234,7 +234,7 @@
             border-top: 1px solid rgba(255,255,255,0.15);
             padding-top: 6px;
             margin-top: 2px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             color: #e2e8f0;
         }
@@ -378,21 +378,21 @@
         /* Simulation Control Panel */
         #sim-controls {
             position: absolute;
-            bottom: 30px;
+            bottom: 25px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 1001;
-            background: rgba(15, 23, 42, 0.92);
+            z-index: 1500;
+            background: rgba(15, 23, 42, 0.95);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.25);
             padding: 14px 20px;
             border-radius: 18px;
-            display: none; /* Controlled via JS */
+            display: none; /* Controlled dynamically by JS */
             flex-direction: column;
             gap: 10px;
             width: 90%;
             max-width: 400px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
             color: #fff;
             pointer-events: auto;
         }
@@ -494,7 +494,7 @@
         </div>
         <div class="sub-info-row">
             <div>速度: <span id="hud-speed">0</span> km/h</div>
-            <div><span id="hud-user-info">未認証</span></div>
+            <div>モード: <span id="hud-mode-text">GPS測位中</span> | <span id="hud-user-info">未認証</span></div>
         </div>
     </div>
 
@@ -543,7 +543,10 @@
                 現在のステータス: <strong id="current-user-display" style="color:#38bdf8;">未登録</strong>
             </div>
             <div class="form-group">
-                <label>参加者ログイン (ナンバー & ドライバー名)</label>
+                <label>参加者ログイン (設定パスワード & ナンバー & 名前)</label>
+                <div style="display:flex; gap:8px; margin-bottom:6px;">
+                    <input type="password" id="input-login-pass" placeholder="ログインパスワード" style="flex:1;">
+                </div>
                 <div style="display:flex; gap:8px;">
                     <input type="text" id="input-car-no" placeholder="No." style="width:70px;">
                     <input type="text" id="input-driver-name" placeholder="ドライバー名" style="flex:1;">
@@ -551,9 +554,9 @@
                 </div>
             </div>
             <div style="border-top: 1px solid rgba(255,255,255,0.15); padding-top:12px;">
-                <label style="color:#f59e0b; font-weight:700; font-size:13px;">管理者設定 (要パスワード)</label>
+                <label style="color:#f59e0b; font-weight:700; font-size:13px;">管理者設定 (要マスターパスワード)</label>
                 <div style="display:flex; gap:8px; margin-top:6px;">
-                    <input type="password" id="admin-pass" placeholder="管理者パスワード" style="flex:1;">
+                    <input type="password" id="admin-pass" placeholder="管理者マスターパスワード" style="flex:1;">
                     <button class="modal-btn btn-secondary" onclick="openAdminSettings()">設定を開く</button>
                 </div>
             </div>
@@ -576,16 +579,16 @@
                 <input type="text" id="admin-event-name" placeholder="例: 第1回 クーパーズカップ">
             </div>
             <div class="form-group">
+                <label>コース名 (SS名)</label>
+                <input type="text" id="admin-course-name" placeholder="例: 御岳山ヒルクライム SS1">
+            </div>
+            <div class="form-group">
                 <label>開催日時</label>
                 <input type="datetime-local" id="admin-event-date">
             </div>
             <div class="form-group">
-                <label>コース名 / SS名</label>
-                <input type="text" id="admin-course-name" placeholder="例: 御岳山SSヒルクライム">
-            </div>
-            <div class="form-group">
-                <label>参加者ログインパスワード設定</label>
-                <input type="text" id="admin-login-pass" placeholder="参加者が認証に使うパスワード">
+                <label>参加者ログイン用パスワード設定</label>
+                <input type="text" id="admin-login-pass" placeholder="参加者が入力するパスワード">
             </div>
             <div class="modal-btn-row">
                 <button class="modal-btn btn-danger" onclick="clearEventResults()">全リザルト初期化</button>
@@ -595,7 +598,7 @@
         </div>
     </div>
 
-    <!-- Simulation Control Panel (Restored and visible in Sim Mode) -->
+    <!-- Simulation Control Panel (Explicitly Included) -->
     <div id="sim-controls">
         <div class="sim-row">
             <button class="sim-btn sim-btn-start" onclick="startSimulationRun()">▶ 走行スタート</button>
@@ -623,7 +626,7 @@
 
         let routeMode = 'none'; 
         let mode = 'gps'; 
-        let mapOrientation = 'north'; 
+        let mapOrientation = 'head'; 
         let realViewActive = false;
         let settingsOpen = false;
         let audioEnabled = true;
@@ -645,12 +648,11 @@
 
         let currentUser = null;
         
-        // Event config & Auth settings stored in localStorage
         let eventConfig = JSON.parse(localStorage.getItem('rally_event_config')) || { 
             name: "第1回 クーパーズカップ タイムアタック", 
-            date: "2026-10-01T10:00", 
-            courseName: "御岳山SS",
-            participantPass: "rally2026" 
+            courseName: "御岳山ヒルクライム SS1", 
+            date: "2026-10-01T10:00",
+            loginPass: "1234" 
         };
         let eventResults = JSON.parse(localStorage.getItem('rally_event_results')) || [];
         let ssStartTime = null;
@@ -984,46 +986,45 @@
         }
 
         function registerParticipant() {
+            const inputPass = document.getElementById('input-login-pass').value.trim();
             const carNo = document.getElementById('input-car-no').value.trim();
             const name = document.getElementById('input-driver-name').value.trim();
-            const inputPass = prompt("参加者ログインパスワードを入力してください：");
-
+            
+            if (inputPass !== eventConfig.loginPass) {
+                alert('ログインパスワードが違います');
+                return;
+            }
             if (!carNo || !name) {
                 alert('カーナンバーとドライバー名を入力してください');
                 return;
             }
-            if (inputPass !== eventConfig.participantPass) {
-                alert('パスワードが違います');
-                return;
-            }
-
             currentUser = { carNo, name };
             document.getElementById('current-user-display').innerText = `No.${carNo} ${name} (ログイン中)`;
             document.getElementById('hud-user-info').innerText = `No.${carNo} ${name}`;
-            alert(`参加登録完了：No.${carNo} ${name}さん、ようこそ！`);
+            alert(`参加登録完了：No.${carNo} ${name}さん、お疲れ様です！`);
         }
 
         function openAdminSettings() {
             const pass = document.getElementById('admin-pass').value;
-            // Default master password or current set participant pass can open admin
-            if (pass !== eventConfig.participantPass && pass !== 'rally2026') {
-                alert('管理者パスワードが違います');
+            if (pass !== 'rally2026') {
+                alert('管理者マスターパスワードが違います');
                 return;
             }
             document.getElementById('admin-event-name').value = eventConfig.name;
-            document.getElementById('admin-event-date').value = eventConfig.date;
             document.getElementById('admin-course-name').value = eventConfig.courseName;
-            document.getElementById('admin-login-pass').value = eventConfig.participantPass;
+            document.getElementById('admin-event-date').value = eventConfig.date;
+            document.getElementById('admin-login-pass').value = eventConfig.loginPass;
             document.getElementById('modal-admin').style.display = 'flex';
         }
 
         function saveAdminSettings() {
             eventConfig.name = document.getElementById('admin-event-name').value;
-            eventConfig.date = document.getElementById('admin-event-date').value;
             eventConfig.courseName = document.getElementById('admin-course-name').value;
-            eventConfig.participantPass = document.getElementById('admin-login-pass').value;
+            eventConfig.date = document.getElementById('admin-event-date').value;
+            eventConfig.loginPass = document.getElementById('admin-login-pass').value;
+            
             localStorage.setItem('rally_event_config', JSON.stringify(eventConfig));
-            alert('管理者設定を保存しました');
+            alert('管理者設定（イベント名・コース名・パスワード）を保存しました');
             document.getElementById('modal-admin').style.display = 'none';
             document.getElementById('event-modal-title').innerText = `🏁 ${eventConfig.name} (${eventConfig.courseName})`;
         }
@@ -1049,7 +1050,7 @@
                     <div>
                         <span style="color:#f59e0b; font-weight:800; margin-right:6px;">#${i+1}</span>
                         <strong style="color:#fff;">No.${res.carNo} ${res.name}</strong>
-                        <div style="font-size:11px; color:#94a3b8;">${res.routeName} / ${res.date}</div>
+                        <div style="font-size:11px; color:#94a3b8;">${res.courseName || eventConfig.courseName} / ${res.date}</div>
                     </div>
                     <div style="font-size:15px; font-weight:800; color:#22c55e;">${res.timeFormatted}</div>
                 </div>
@@ -1164,7 +1165,8 @@
                     name: currentUser.name,
                     timeSec: timeSec,
                     timeFormatted: timeFormatted,
-                    routeName: `${eventConfig.name} (${eventConfig.courseName})`,
+                    eventName: eventConfig.name,
+                    courseName: eventConfig.courseName,
                     date: new Date().toLocaleDateString()
                 });
                 localStorage.setItem('rally_event_results', JSON.stringify(eventResults));
