@@ -138,7 +138,7 @@
             transform: translateX(-50%);
             z-index: 1000;
             width: 94%;
-            max-width: 460px;
+            max-width: 480px;
             background: rgba(15, 23, 42, 0.88);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -190,6 +190,12 @@
         
         .distance-section {
             display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+        .distance-row {
+            display: flex;
             align-items: center;
             gap: 6px;
         }
@@ -226,6 +232,26 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         }
         .unit-toggle-btn:active { transform: scale(0.92); }
+
+        /* Settings Icon Button (Positioned top-right under the distance/unit slider) */
+        .settings-icon-btn {
+            pointer-events: auto;
+            background: #2563eb;
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            width: 32px;
+            height: 28px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+        .settings-icon-btn:active { transform: scale(0.90); }
         
         .sub-info-row {
             display: flex;
@@ -239,31 +265,18 @@
             color: #e2e8f0;
         }
 
-        /* Settings Menu Container (Bottom Left) */
+        /* Settings Dropdown Menu (Positioned near top-left or top-right based on settings button) */
         #settings-container {
             position: absolute;
-            bottom: 95px;
-            left: 15px;
-            z-index: 1001;
+            top: 105px;
+            right: 15px;
+            z-index: 1005;
             display: flex;
-            flex-direction: column-reverse;
-            align-items: flex-start;
+            flex-direction: column;
+            align-items: flex-end;
             gap: 8px;
             pointer-events: auto;
         }
-        .main-settings-btn {
-            background: #2563eb;
-            color: #ffffff;
-            border: 2px solid rgba(255,255,255,0.4);
-            padding: 12px 20px;
-            border-radius: 14px;
-            font-size: 15px;
-            font-weight: 800;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .main-settings-btn:active { transform: scale(0.95); }
         #controls-panel {
             display: none; 
             flex-direction: column;
@@ -387,7 +400,7 @@
             border: 1px solid rgba(255,255,255,0.25);
             padding: 14px 20px;
             border-radius: 18px;
-            display: none; /* Controlled dynamically by JS */
+            display: none;
             flex-direction: column;
             gap: 10px;
             width: 90%;
@@ -447,6 +460,28 @@
             pointer-events: none;
             max-width: 90%;
         }
+
+        /* WRC Style Red Round Sign Marker & Directional Arrow Marker Styles */
+        .wrc-sign-marker {
+            background: #dc2626;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            color: #ffffff;
+            font-weight: 900;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+        .car-arrow-marker {
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -485,11 +520,15 @@
             </div>
             <div id="hud-bend" class="bend-text">---</div>
             <div class="distance-section">
-                <div class="info-group">
-                    <div id="hud-distance" class="distance-val">-- m</div>
-                    <div class="distance-label">Next Corner</div>
+                <div class="distance-row">
+                    <div class="info-group">
+                        <div id="hud-distance" class="distance-val">-- m</div>
+                        <div class="distance-label">Next Corner</div>
+                    </div>
+                    <button id="btn-unit-toggle" class="unit-toggle-btn" onclick="toggleDistanceUnit()">10m</button>
                 </div>
-                <button id="btn-unit-toggle" class="unit-toggle-btn" onclick="toggleDistanceUnit()">10m</button>
+                <!-- Settings Icon Button placed right under the distance/unit slider -->
+                <button class="settings-icon-btn" onclick="toggleSettingsMenu()" title="設定">⚙</button>
             </div>
         </div>
         <div class="sub-info-row">
@@ -498,9 +537,8 @@
         </div>
     </div>
 
-    <!-- Settings Menu Container (Bottom Left) -->
+    <!-- Settings Menu Container (Top Right under HUD) -->
     <div id="settings-container">
-        <button class="main-settings-btn" onclick="toggleSettingsMenu()">⚙ 設定</button>
         <div id="controls-panel">
             <button id="btn-route-mode" class="ctrl-btn" onclick="toggleRouteMode()">📍 ルート設定</button>
             <button class="ctrl-btn" onclick="openRouteManagerModal()">📁 ルート管理・保存</button>
@@ -598,7 +636,7 @@
         </div>
     </div>
 
-    <!-- Simulation Control Panel (Explicitly Included) -->
+    <!-- Simulation Control Panel -->
     <div id="sim-controls">
         <div class="sim-row">
             <button class="sim-btn sim-btn-start" onclick="startSimulationRun()">▶ 走行スタート</button>
@@ -614,7 +652,7 @@
     </div>
 
     <!-- Instructions Banner -->
-    <div id="banner">「設定」から「ルート設定」を選んで地図上のスタートとフィニッシュをタップしてください</div>
+    <div id="banner">「⚙ 設定」から「ルート設定」を選んで地図上のスタートとフィニッシュをタップしてください</div>
 
     <!-- Leaflet JS & Turf.js -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -787,15 +825,26 @@
             toggleSettingsMenu();
         }
 
+        // Helper to create WRC-style round red sign markers
+        function createWrcMarker(text, isStart = true) {
+            const size = 32;
+            return L.divIcon({
+                className: 'wrc-sign-marker',
+                html: `<div style="width:${size}px; height:${size}px; background:${isStart ? '#dc2626' : '#b91c1c'}; border:3px solid #fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; box-shadow:0 3px 8px rgba(0,0,0,0.5);">${text}</div>`,
+                iconSize: [size, size],
+                iconAnchor: [size/2, size/2]
+            });
+        }
+
         map.on('click', async function(e) {
             if (routeMode === 'start') {
                 startPoint = [e.latlng.lng, e.latlng.lat];
-                L.marker(e.latlng, {title: 'Start'}).addTo(markersGroup).bindPopup('スタート地点').openPopup();
+                L.marker(e.latlng, {icon: createWrcMarker('SS', true)}).addTo(markersGroup).bindPopup('スタート (START)').openPopup();
                 routeMode = 'finish';
                 showBanner('次に地図上で【フィニッシュ地点】をタップしてください');
             } else if (routeMode === 'finish') {
                 finishPoint = [e.latlng.lng, e.latlng.lat];
-                L.marker(e.latlng, {title: 'Finish'}).addTo(markersGroup).bindPopup('フィニッシュ地点').openPopup();
+                L.marker(e.latlng, {icon: createWrcMarker('STOP', false)}).addTo(markersGroup).bindPopup('フィニッシュ (STOP)').openPopup();
                 routeMode = 'ready';
                 document.getElementById('btn-route-mode').classList.remove('active-mode');
                 showBanner('ルートを計算中...');
@@ -963,8 +1012,8 @@
             startPoint = r.start;
             finishPoint = r.finish;
             markersGroup.clearLayers();
-            L.marker([startPoint[1], startPoint[0]], {title: 'Start'}).addTo(markersGroup).bindPopup('スタート');
-            L.marker([finishPoint[1], finishPoint[0]], {title: 'Finish'}).addTo(markersGroup).bindPopup('フィニッシュ');
+            L.marker([startPoint[1], startPoint[0]], {icon: createWrcMarker('SS', true)}).addTo(markersGroup).bindPopup('スタート');
+            L.marker([finishPoint[1], finishPoint[0]], {icon: createWrcMarker('STOP', false)}).addTo(markersGroup).bindPopup('フィニッシュ');
             
             closeModals();
             showBanner(`ルート「${r.name}」を読み込み中...`);
@@ -1057,6 +1106,20 @@
             `).join('');
         }
 
+        // Helper to create directional arrow marker for car position
+        function createCarArrowIcon(heading = 0) {
+            return L.divIcon({
+                className: 'car-arrow-marker',
+                html: `<div style="transform: rotate(${heading}deg); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L3 19L12 15L21 19L12 2Z" fill="#ef4444" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+                    </svg>
+                </div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+        }
+
         let lastLat = null;
         let lastLng = null;
 
@@ -1098,7 +1161,7 @@
             }
             simRunning = true;
             if (!simMarker) {
-                simMarker = L.circleMarker(routeCoords[0], {radius: 9, color: '#dc2626', fillColor: '#ef4444', fillOpacity: 1}).addTo(map);
+                simMarker = L.marker(routeCoords[0], {icon: createCarArrowIcon(0)}).addTo(map);
             }
             
             isTiming = true;
@@ -1132,7 +1195,10 @@
                 const ptAhead = turf.along(turfLine, Math.min(totalDist, accumulatedDist + 2), {units: 'meters'});
                 const heading = turf.bearing(pt, ptAhead);
 
-                simMarker.setLatLng(coord);
+                if (simMarker) {
+                    simMarker.setLatLng(coord);
+                    simMarker.setIcon(createCarArrowIcon(heading));
+                }
                 currentSpeed = simSpeedKmh;
                 
                 updateNavigation(coord, accumulatedDist, heading);
@@ -1228,7 +1294,8 @@
                 updateHUD(distToCorner, bendText, nextCorner.level, currentSpeed, nextCorner.dir);
                 updateRoadVisual(distToCorner, nextCorner.dir, nextCorner.level);
 
-                if (rawDist >= 45 && rawDist <= 75) {
+                // Voice guidance condition: when remaining distance is around 35m - 45m (when approaching 30m+ zone)
+                if (rawDist >= 30 && rawDist <= 45) {
                     if (lastSpokenCornerId !== cornerIndex) {
                         lastSpokenCornerId = cornerIndex;
                         const dirName = nextCorner.dir === 'R' ? 'アール' : 'エル';
