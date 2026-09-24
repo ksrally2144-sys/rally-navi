@@ -248,6 +248,38 @@
             color: #e2e8f0;
         }
 
+        /* Main Screen SOS / STOP / OK Status Buttons Panel */
+        #status-buttons-container {
+            position: absolute;
+            bottom: 85px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1100;
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+        .status-action-btn {
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 800;
+            border: 2px solid rgba(255,255,255,0.4);
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            color: #fff;
+            transition: all 0.2s;
+        }
+        .status-action-btn:active { transform: scale(0.92); }
+        .btn-sos { background: #dc2626; }
+        .btn-stop-status { background: #d97706; }
+        .btn-ok { background: #16a34a; }
+        .status-action-btn.active-status {
+            box-shadow: 0 0 15px #fff;
+            border-color: #fff;
+            transform: scale(1.05);
+        }
+
         /* Settings Dropdown Menu */
         #settings-container {
             position: absolute;
@@ -291,6 +323,7 @@
         .ctrl-btn.audio-btn.off { background: #334155; border-color: #64748b; color: #94a3b8; }
         .ctrl-btn.event-btn { background: #d97706; border-color: #f59e0b; }
         .ctrl-btn.speech-mode-btn { background: #78350f; border-color: #b45309; }
+        .ctrl-btn.admin-track-btn { background: #0284c7; border-color: #38bdf8; }
 
         /* Modal Screens */
         .modal-overlay {
@@ -370,6 +403,23 @@
             align-items: center;
             border: 1px solid #334155;
             margin-bottom: 8px;
+        }
+
+        /* Admin Tracking Modal Fullscreen Style */
+        #modal-admin-tracking {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            z-index: 3000;
+            flex-direction: column;
+        }
+        #tracking-map {
+            flex: 1;
+            width: 100%;
         }
 
         /* Simulation Control Panel */
@@ -464,6 +514,20 @@
             align-items: center;
             justify-content: center;
         }
+        .track-car-marker {
+            background: #1e293b;
+            border: 2px solid #38bdf8;
+            border-radius: 8px;
+            color: #fff;
+            padding: 4px 8px;
+            font-weight: 800;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -518,13 +582,21 @@
         </div>
     </div>
 
+    <!-- Main Screen Status Action Buttons (SOS / STOP / OK) -->
+    <div id="status-buttons-container">
+        <button id="btn-status-sos" class="status-action-btn btn-sos" onclick="sendStatus('SOS')">🚨 SOS</button>
+        <button id="btn-status-stop" class="status-action-btn btn-stop-status" onclick="sendStatus('STOP')">⏹ STOP</button>
+        <button id="btn-status-ok" class="status-action-btn btn-ok" onclick="sendStatus('OK')">✅ OK</button>
+    </div>
+
     <!-- Settings Menu Container -->
     <div id="settings-container">
         <div id="controls-panel">
             <button id="btn-route-mode" class="ctrl-btn" onclick="toggleRouteMode()">📍 ルート設定</button>
             <button class="ctrl-btn" onclick="openRouteManagerModal()">📁 ルート管理・保存</button>
             <button class="ctrl-btn event-btn" onclick="openEventModal()">🏁 イベント・タイム計測</button>
-            <button id="btn-speech-mode" class="ctrl-btn speech-mode-btn" onclick="toggleSpeechOrderMode()">🔊 案内: 角度⇒距離</button>
+            <button class="ctrl-btn admin-track-btn" onclick="openAdminTrackingModal()">🛰 車両トラッキング地図</button>
+            <button class="ctrl-btn speech-mode-btn" onclick="toggleSpeechOrderMode()">🔊 案内: 角度⇒距離</button>
             <button id="btn-gps-mode" class="ctrl-btn active-mode" onclick="setMode('gps')">🛰 GPSモード</button>
             <button id="btn-sim-mode" class="ctrl-btn" onclick="setMode('sim')">🎮 シミュ切替</button>
             <button id="btn-map-mode" class="ctrl-btn" onclick="toggleMapOrientation()">🗺 地図:ヘッド</button>
@@ -532,6 +604,15 @@
             <button id="btn-audio-toggle" class="ctrl-btn audio-btn" onclick="toggleAudioGuide()">🔊 音声案内: ON</button>
             <button id="btn-reset" class="ctrl-btn" onclick="resetRoute()" style="color:#f87171;">🔄 リセット</button>
         </div>
+    </div>
+
+    <!-- Admin Tracking Map Screen Modal -->
+    <div id="modal-admin-tracking">
+        <div style="background:#0f172a; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.2);">
+            <div style="font-size:16px; font-weight:800; color:#38bdf8;">🛰 管理者用・全参加車両リアルタイムトラッキング</div>
+            <button class="modal-btn btn-secondary" onclick="closeAdminTrackingModal()">閉じる</button>
+        </div>
+        <div id="tracking-map"></div>
     </div>
 
     <!-- Modal: Route Manager -->
@@ -650,8 +731,8 @@
         let realViewActive = false;
         let settingsOpen = false;
         let audioEnabled = true;
-        let speechOrderMode = 'angle-first'; // 'angle-first' (アール3、50m) or 'distance-first' (50m、アール3)
-        let lastPassedCornerIndex = -1; // Tracks the corner that was just passed to trigger immediate post-corner speech
+        let speechOrderMode = 'angle-first'; 
+        let lastPassedCornerIndex = -1; 
 
         let startPoint = null;
         let finishPoint = null;
@@ -668,7 +749,11 @@
         let simMarker = null;
 
         let currentUser = null;
+        let currentStatus = null; // 'SOS', 'STOP', 'OK' or null
         
+        // Active fleet positions stored in localStorage for multi-car tracking simulation/sync
+        let allFleetLocations = JSON.parse(localStorage.getItem('rally_fleet_locations')) || {};
+
         let eventConfig = JSON.parse(localStorage.getItem('rally_event_config')) || { 
             name: "第1回 クーパーズカップ タイムアタック", 
             courseName: "御岳山ヒルクライム SS1", 
@@ -1104,6 +1189,102 @@
             `).join('');
         }
 
+        // Send Status (SOS, STOP, OK) from main screen
+        function sendStatus(status) {
+            if (!currentUser) {
+                alert('先に「イベント・タイム計測」から参加者ログインしてください。');
+                openEventModal();
+                return;
+            }
+            currentStatus = currentStatus === status ? null : status; // Toggle off if clicked again
+
+            // Update UI buttons state
+            document.getElementById('btn-status-sos').classList.toggle('active-status', currentStatus === 'SOS');
+            document.getElementById('btn-status-stop').classList.toggle('active-status', currentStatus === 'STOP');
+            document.getElementById('btn-status-ok').classList.toggle('active-status', currentStatus === 'OK');
+
+            // Save to fleet location store
+            if (allFleetLocations[currentUser.carNo]) {
+                allFleetLocations[currentUser.carNo].status = currentStatus;
+                localStorage.setItem('rally_fleet_locations', JSON.stringify(allFleetLocations));
+            }
+
+            if (currentStatus) {
+                speakText(`ステータス、${currentStatus}を発信しました`);
+            } else {
+                speakText('ステータスを解除しました');
+            }
+        }
+
+        // Admin Tracking Map Logic
+        let trackingMap = null;
+        let trackingMarkers = {};
+
+        function openAdminTrackingModal() {
+            const pass = prompt('管理者マスターパスワードを入力してください:');
+            if (pass !== 'rally2026') {
+                alert('マスターパスワードが違います');
+                return;
+            }
+
+            document.getElementById('modal-admin-tracking').style.display = 'flex';
+            toggleSettingsMenu();
+
+            if (!trackingMap) {
+                trackingMap = L.map('tracking-map').setView([36.236, 137.958], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(trackingMap);
+            } else {
+                trackingMap.invalidateSize();
+            }
+
+            updateTrackingMapMarkers();
+        }
+
+        function closeAdminTrackingModal() {
+            document.getElementById('modal-admin-tracking').style.display = 'none';
+        }
+
+        function updateTrackingMapMarkers() {
+            if (!trackingMap) return;
+            allFleetLocations = JSON.parse(localStorage.getItem('rally_fleet_locations')) || {};
+
+            for (let carNo in allFleetLocations) {
+                const data = allFleetLocations[carNo];
+                const latLng = [data.lat, data.lng];
+                const statusBadge = data.status ? ` <span style="background:${data.status === 'SOS' ? '#dc2626' : data.status === 'STOP' ? '#d97706' : '#16a34a'}; color:#fff; padding:2px 6px; border-radius:4px; font-size:11px;">${data.status}</span>` : '';
+                
+                const icon = L.divIcon({
+                    className: 'track-car-marker',
+                    html: `<div>No.${carNo} ${data.name || ''}${statusBadge}</div>`,
+                    iconSize: [100, 32],
+                    iconAnchor: [50, 16]
+                });
+
+                if (trackingMarkers[carNo]) {
+                    trackingMarkers[carNo].setLatLng(latLng);
+                    trackingMarkers[carNo].setIcon(icon);
+                } else {
+                    trackingMarkers[carNo] = L.marker(latLng, {icon: icon}).addTo(trackingMap);
+                }
+            }
+        }
+
+        function updateFleetLocation(lat, lng) {
+            if (!currentUser) return;
+            allFleetLocations = JSON.parse(localStorage.getItem('rally_fleet_locations')) || {};
+            allFleetLocations[currentUser.carNo] = {
+                name: currentUser.name,
+                lat: lat,
+                lng: lng,
+                status: currentStatus,
+                updatedAt: Date.now()
+            };
+            localStorage.setItem('rally_fleet_locations', JSON.stringify(allFleetLocations));
+            if (document.getElementById('modal-admin-tracking').style.display === 'flex') {
+                updateTrackingMapMarkers();
+            }
+        }
+
         function createCarArrowIcon(heading = 0) {
             return L.divIcon({
                 className: 'car-arrow-marker',
@@ -1127,6 +1308,8 @@
                     const lng = pos.coords.longitude;
                     currentSpeed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
                     
+                    updateFleetLocation(lat, lng);
+
                     if (mode === 'gps' && routeCoords.length > 0) {
                         let heading = 0;
                         if (lastLat !== null && lastLng !== null) {
@@ -1198,6 +1381,7 @@
                 }
                 currentSpeed = simSpeedKmh;
                 
+                updateFleetLocation(coord[0], coord[1]);
                 updateNavigation(coord, accumulatedDist, heading);
             }, intervalMs);
         }
@@ -1291,15 +1475,11 @@
                 updateHUD(distToCorner, bendText, nextCorner.level, currentSpeed, nextCorner.dir);
                 updateRoadVisual(distToCorner, nextCorner.dir, nextCorner.level);
 
-                // Check if we just passed a corner (the car has crossed the corner's location point)
-                // When nearestDist is slightly past a corner (e.g., within 0 to 8 meters after the corner), trigger immediate speech for the NEXT corner
                 for (let i = 0; i < corners.length; i++) {
                     const c = corners[i];
-                    // If car is just 0 to 8 meters past this corner and we haven't spoken for passing this corner yet
                     if (nearestDist >= c.distanceAlong && nearestDist <= c.distanceAlong + 8 && lastPassedCornerIndex !== i) {
                         lastPassedCornerIndex = i;
                         
-                        // Find the subsequent corner after this passed one
                         let subsequentCorner = null;
                         for (let j = 0; j < corners.length; j++) {
                             if (corners[j].distanceAlong > nearestDist) {
@@ -1316,10 +1496,8 @@
 
                             let speechString = '';
                             if (speechOrderMode === 'angle-first') {
-                                // Angle first: e.g., "エル、スリー、50メートル"
                                 speechString = `${dirName}、${lvl}、${subDistRounded}メートル`;
                             } else {
-                                // Distance first: e.g., "50メートル、エル、スリー"
                                 speechString = `${subDistRounded}メートル、${dirName}、${lvl}`;
                             }
                             speakText(speechString);
